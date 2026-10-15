@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiet Editor</title>
+<style>
+  :root {
+    --bg: #faf8f4;
+    --fg: #2b2b2b;
+    --muted: #9a958c;
+    --track: #e4dfd3;
+    --fill1: #5b8a72;
+    --fill2: #4a7fc1;
+    --fill3: #e0b020;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b1b1d; --fg: #dcdad5; --muted: #6d6b66; --track: #2e2e32; --fill1: #6fae92; --fill2: #6a9fe0; --fill3: #f0c845; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  }
+  textarea {
+    display: block;
+    width: 100%;
+    max-width: 720px;
+    height: 100%;
+    margin: 0 auto;
+    padding: 12vh 24px 96px;
+    border: 0;
+    outline: 0;
+    resize: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 1.2rem;
+    line-height: 1.7;
+    caret-color: var(--fg);
+  }
+  textarea::placeholder { color: var(--muted); }
+  #count {
+    position: fixed;
+    right: 20px;
+    bottom: 16px;
+    font: 0.85rem/1 -apple-system, system-ui, sans-serif;
+    color: var(--muted);
+    user-select: none;
+    transition: opacity .3s;
+  }
+  body.typing #count { opacity: .35; }
+  #bars {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    pointer-events: none;
+  }
+  .bar { height: 5px; background: var(--track); }
+  .bar > i {
+    display: block;
+    height: 100%;
+    width: 0;
+    transition: width .3s;
+  }
+  #bar1 > i { background: var(--fill1); }
+  #bar2 > i { background: var(--fill2); }
+  #bar3 > i { background: var(--fill3); }
+  #bar2, #bar3 { display: none; }
+  #bar2.show, #bar3.show { display: block; }
+  #corner {
+    position: fixed;
+    left: 20px;
+    bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    font: 0.85rem/1 -apple-system, system-ui, sans-serif;
+    color: var(--muted);
+    user-select: none;
+  }
+  #file:empty { display: none; }
+  #help { position: relative; }
+  #help > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--muted);
+    border-radius: 50%;
+    font-size: 0.75rem;
+    cursor: help;
+  }
+  #help > dl {
+    position: absolute;
+    left: 0;
+    bottom: 26px;
+    display: none;
+    grid-template-columns: auto auto;
+    gap: 6px 16px;
+    margin: 0;
+    padding: 12px 14px;
+    white-space: nowrap;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--track);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .12);
+  }
+  #help:hover > dl, #help:focus-within > dl { display: grid; }
+  #help dt { color: var(--muted); }
+  #help dd { margin: 0; }
+</style>
+</head>
+<body>
+<textarea id="editor" placeholder="Start writing…" autofocus spellcheck="true"></textarea>
+<div id="bars" aria-hidden="true">
+  <div class="bar" id="bar1"><i></i></div>
+  <div class="bar" id="bar2"><i></i></div>
+  <div class="bar" id="bar3"><i></i></div>
+</div>
+<div id="corner">
+  <div id="help" tabindex="0">
+    <span aria-label="Keyboard shortcuts">?</span>
+    <dl>
+      <dt>Open file</dt><dd>⌘/Ctrl + O</dd>
+      <dt>Save file</dt><dd>⌘/Ctrl + S</dd>
+      <dt>Full screen</dt><dd id="fullscreen-key">F11</dd>
+    </dl>
+  </div>
+  <div id="file"></div>
+</div>
+<div id="count" aria-live="polite">0 words</div>
+
+<script>
+  const editor = document.getElementById('editor');
+  const count = document.getElementById('count');
+  // Goal bars: 0–800, then 800–1200, then 1200–1600. A bar appears once the previous one is full.
+  const GOALS = [0, 800, 1200, 1600];
+  const bars = [1, 2, 3].map(n => document.getElementById('bar' + n));
+  const KEY = 'quiet-editor-text';
+  let idle;
+
+  function update() {
+    const text = editor.value;
+    const words = (text.match(/\S+/g) || []).length;
+    const chars = text.length;
+    count.textContent = `${words} ${words === 1 ? 'word' : 'words'} · ${chars} chars`;
+
+    bars.forEach((bar, i) => {
+      const from = GOALS[i], to = GOALS[i + 1];
+      bar.classList.toggle('show', words >= from);
+      bar.firstElementChild.style.width = Math.min(Math.max((words - from) / (to - from), 0), 1) * 100 + '%';
+    });
+  }
+
+  try { editor.value = localStorage.getItem(KEY) || ''; } catch (e) {}
+  update();
+
+  // --- Open / save a file on disk (File System Access API; Chromium browsers) ---
+  const fileLabel = document.getElementById('file');
+  const canPick = 'showOpenFilePicker' in window;
+  const PICKER_TYPES = [{ description: 'Markdown', accept: { 'text/markdown': ['.md', '.markdown', '.txt'] } }];
+  let handle = null;   // FileSystemFileHandle of the open file
+  let name = '';       // name shown in the corner
+  let dirty = false;
+
+  function showFile() {
+    fileLabel.textContent = name ? name + (dirty ? ' •' : '') : (dirty ? 'unsaved •' : '');
+  }
+
+  function setDirty(value) { dirty = value; showFile(); }
+
+  async function openFile() {
+    try {
+      if (canPick) {
+        [handle] = await window.showOpenFilePicker({ types: PICKER_TYPES });
+        const file = await handle.getFile();
+        name = file.name;
+        editor.value = await file.text();
+      } else {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.md,.markdown,.txt';
+        const file = await new Promise(resolve => {
+          input.onchange = () => resolve(input.files[0]);
+          input.click();
+        });
+        if (!file) return;
+        handle = null;
+        name = file.name;
+        editor.value = await file.text();
+      }
+      update();
+      setDirty(false);
+    } catch (e) { /* picker cancelled */ }
+  }
+
+  async function saveFile() {
+    try {
+      if (canPick) {
+        if (!handle) {
+          handle = await window.showSaveFilePicker({ suggestedName: name || 'untitled.md', types: PICKER_TYPES });
+          name = handle.name;
+        }
+        const writable = await handle.createWritable();
+        await writable.write(editor.value);
+        await writable.close();
+      } else {
+        // No write access in this browser: download a copy instead.
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([editor.value], { type: 'text/markdown' }));
+        a.download = name || 'untitled.md';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+      setDirty(false);
+    } catch (e) { /* save cancelled */ }
+  }
+
+  // Full screen is the browser's own shortcut; just show the right one.
+  document.getElementById('fullscreen-key').textContent =
+    /Mac/i.test(navigator.platform) ? 'Ctrl + ⌘ + F' : 'F11';
+
+  document.addEventListener('keydown', e => {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+    const key = e.key.toLowerCase();
+    if (key === 's') { e.preventDefault(); saveFile(); }
+    else if (key === 'o') { e.preventDefault(); openFile(); }
+  });
+
+  window.addEventListener('beforeunload', e => {
+    if (dirty) e.preventDefault();
+  });
+
+  editor.addEventListener('input', () => {
+    update();
+    setDirty(true);
+    try { localStorage.setItem(KEY, editor.value); } catch (e) {}
+    document.body.classList.add('typing');
+    clearTimeout(idle);
+    idle = setTimeout(() => document.body.classList.remove('typing'), 1500);
+  });
+</script>
+</body>
+</html>
