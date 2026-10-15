@@ -3,19 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quiet Editor</title>
+<title>JustWrite</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f1f22'/%3E%3Crect x='12' y='10' width='40' height='4' rx='2' fill='%235b8a72'/%3E%3Crect x='12' y='17' width='28' height='4' rx='2' fill='%234a7fc1'/%3E%3Crect x='12' y='24' width='16' height='4' rx='2' fill='%23e0b020'/%3E%3Cpath d='M29 36H49M40 36V46Q40 55 31 55Q23 55 21 48' fill='none' stroke='%23faf8f4' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #faf8f4;
     --fg: #2b2b2b;
     --muted: #9a958c;
     --track: #e4dfd3;
-    --fill1: #5b8a72;
-    --fill2: #4a7fc1;
-    --fill3: #e0b020;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #1b1b1d; --fg: #dcdad5; --muted: #6d6b66; --track: #2e2e32; --fill1: #6fae92; --fill2: #6a9fe0; --fill3: #f0c845; }
+    :root { --bg: #1b1b1d; --fg: #dcdad5; --muted: #6d6b66; --track: #2e2e32; }
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -69,11 +67,7 @@
     width: 0;
     transition: width .3s;
   }
-  #bar1 > i { background: var(--fill1); }
-  #bar2 > i { background: var(--fill2); }
-  #bar3 > i { background: var(--fill3); }
-  #bar2, #bar3 { display: none; }
-  #bar2.show, #bar3.show { display: block; }
+  .bar:not(.show) { display: none; }
   #corner {
     position: fixed;
     left: 20px;
@@ -87,8 +81,9 @@
     user-select: none;
   }
   #file:empty { display: none; }
+  #icons { display: flex; gap: 8px; }
   #help { position: relative; }
-  #help > span {
+  .icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -97,8 +92,13 @@
     border: 1px solid var(--muted);
     border-radius: 50%;
     font-size: 0.75rem;
-    cursor: help;
+    cursor: pointer;
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-family: inherit;
   }
+  #help > .icon { cursor: help; }
   #help > dl {
     position: absolute;
     left: 0;
@@ -118,36 +118,137 @@
   #help:hover > dl, #help:focus-within > dl { display: grid; }
   #help dt { color: var(--muted); }
   #help dd { margin: 0; }
+  #settings {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, .25);
+    font: 0.9rem/1.3 -apple-system, system-ui, sans-serif;
+  }
+  #settings.open { display: flex; }
+  #settings .card {
+    width: min(420px, calc(100vw - 32px));
+    padding: 20px;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--track);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .2);
+  }
+  #settings h2 { margin: 0 0 4px; font-size: 1rem; }
+  #settings p { margin: 0 0 14px; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .row span { color: var(--muted); }
+  .row input[type=number] {
+    width: 90px;
+    padding: 5px 8px;
+    border: 1px solid var(--track);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+  .row input[type=color] {
+    width: 36px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--track);
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+  }
+  #settings button {
+    padding: 5px 10px;
+    border: 1px solid var(--track);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  #settings button:disabled { opacity: .4; cursor: default; }
+  .row .remove { margin-left: auto; color: var(--muted); }
+  .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .actions .close { margin-left: auto; }
 </style>
 </head>
 <body>
 <textarea id="editor" placeholder="Start writing…" autofocus spellcheck="true"></textarea>
-<div id="bars" aria-hidden="true">
-  <div class="bar" id="bar1"><i></i></div>
-  <div class="bar" id="bar2"><i></i></div>
-  <div class="bar" id="bar3"><i></i></div>
-</div>
+<div id="bars" aria-hidden="true"></div>
 <div id="corner">
-  <div id="help" tabindex="0">
-    <span aria-label="Keyboard shortcuts">?</span>
-    <dl>
-      <dt>Open file</dt><dd>⌘/Ctrl + O</dd>
-      <dt>Save file</dt><dd>⌘/Ctrl + S</dd>
-      <dt>Full screen</dt><dd id="fullscreen-key">F11</dd>
-    </dl>
+  <div id="icons">
+    <div id="help" tabindex="0">
+      <span class="icon" aria-label="Keyboard shortcuts">?</span>
+      <dl>
+        <dt>Open file</dt><dd>⌘/Ctrl + O</dd>
+        <dt>Save file</dt><dd>⌘/Ctrl + S</dd>
+        <dt>Full screen</dt><dd id="fullscreen-key">F11</dd>
+      </dl>
+    </div>
+    <button class="icon" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
   </div>
   <div id="file"></div>
 </div>
 <div id="count" aria-live="polite">0 words</div>
 
+<div id="settings" role="dialog" aria-label="Progress bar settings">
+  <div class="card">
+    <h2>Progress bars</h2>
+    <p>Each bar fills up to its word count. The next bar appears once the previous one is full.</p>
+    <div id="rows"></div>
+    <div class="actions">
+      <button id="add">Add bar</button>
+      <button id="reset">Reset</button>
+      <button class="close" id="close">Done</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const editor = document.getElementById('editor');
   const count = document.getElementById('count');
-  // Goal bars: 0–800, then 800–1200, then 1200–1600. A bar appears once the previous one is full.
-  const GOALS = [0, 800, 1200, 1600];
-  const bars = [1, 2, 3].map(n => document.getElementById('bar' + n));
-  const KEY = 'quiet-editor-text';
+  const KEY = 'quiet-editor-text';          // draft text (key kept so existing drafts survive the rename)
+  const BARS_KEY = 'justwrite-bars';
+  const MAX_BARS = 5;
+  const DEFAULT_BARS = [
+    { to: 800, color: '#5b8a72' },
+    { to: 1200, color: '#4a7fc1' },
+    { to: 1600, color: '#e0b020' },
+  ];
   let idle;
+
+  // --- Progress bars: each bar fills from the previous bar's end up to its own `to`. ---
+  const barsEl = document.getElementById('bars');
+  let barSettings = loadBars();
+
+  function cleanBars(list) {
+    const valid = (Array.isArray(list) ? list : [])
+      .filter(b => b && Number.isFinite(+b.to) && +b.to > 0 && /^#[0-9a-f]{6}$/i.test(b.color))
+      .map(b => ({ to: Math.round(+b.to), color: b.color }))
+      .sort((a, b) => a.to - b.to)
+      .filter((b, i, all) => i === 0 || b.to !== all[i - 1].to)
+      .slice(0, MAX_BARS);
+    return valid.length ? valid : DEFAULT_BARS.map(b => ({ ...b }));
+  }
+
+  function loadBars() {
+    try { return cleanBars(JSON.parse(localStorage.getItem(BARS_KEY))); } catch (e) {}
+    return cleanBars(null);
+  }
+
+  function renderBars() {
+    barsEl.innerHTML = '';
+    for (const b of barSettings) {
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      const fill = document.createElement('i');
+      fill.style.background = b.color;
+      bar.appendChild(fill);
+      barsEl.appendChild(bar);
+    }
+  }
 
   function update() {
     const text = editor.value;
@@ -155,15 +256,79 @@
     const chars = text.length;
     count.textContent = `${words} ${words === 1 ? 'word' : 'words'} · ${chars} chars`;
 
-    bars.forEach((bar, i) => {
-      const from = GOALS[i], to = GOALS[i + 1];
+    barsEl.childNodes.forEach((bar, i) => {
+      const from = i ? barSettings[i - 1].to : 0, to = barSettings[i].to;
       bar.classList.toggle('show', words >= from);
       bar.firstElementChild.style.width = Math.min(Math.max((words - from) / (to - from), 0), 1) * 100 + '%';
     });
   }
 
+  renderBars();
   try { editor.value = localStorage.getItem(KEY) || ''; } catch (e) {}
   update();
+
+  // --- Settings panel ---
+  const settingsEl = document.getElementById('settings');
+  const rowsEl = document.getElementById('rows');
+  const addBtn = document.getElementById('add');
+  let rows = [];   // editable copy of the settings; may be temporarily invalid while typing
+
+  function applyRows() {
+    barSettings = cleanBars(rows.map(r => ({ to: r.to, color: r.color })));
+    try { localStorage.setItem(BARS_KEY, JSON.stringify(barSettings)); } catch (e) {}
+    renderBars();
+    update();
+  }
+
+  function renderRows() {
+    rowsEl.innerHTML = '';
+    rows.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = '<span>Up to</span><input type="number" min="1" step="50" aria-label="Word count"><span>words</span>' +
+        '<input type="color" aria-label="Color"><button class="remove" aria-label="Remove bar">✕</button>';
+      const [num, color] = row.querySelectorAll('input');
+      num.value = r.to;
+      color.value = r.color;
+      num.oninput = () => { r.to = num.value; applyRows(); };
+      num.onchange = () => { rows = barSettings.map(b => ({ ...b })); renderRows(); };   // tidy up: sort, drop duplicates
+      color.oninput = () => { r.color = color.value; applyRows(); };
+      row.querySelector('.remove').onclick = () => { rows.splice(i, 1); applyRows(); renderRows(); };
+      rowsEl.appendChild(row);
+    });
+    addBtn.disabled = rows.length >= MAX_BARS;
+    rowsEl.querySelectorAll('.remove').forEach(b => b.disabled = rows.length <= 1);
+  }
+
+  function openSettings() {
+    rows = barSettings.map(b => ({ ...b }));
+    renderRows();
+    settingsEl.classList.add('open');
+  }
+
+  function closeSettings() {
+    settingsEl.classList.remove('open');
+    editor.focus();
+  }
+
+  addBtn.onclick = () => {
+    const last = rows[rows.length - 1];
+    rows.push({ to: Math.round((+last.to || 0) + 400), color: '#c0504d' });
+    applyRows();
+    rows = barSettings.map(b => ({ ...b }));
+    renderRows();
+  };
+  document.getElementById('reset').onclick = () => {
+    rows = DEFAULT_BARS.map(b => ({ ...b }));
+    applyRows();
+    renderRows();
+  };
+  document.getElementById('close').onclick = closeSettings;
+  document.getElementById('settings-btn').onclick = openSettings;
+  settingsEl.addEventListener('click', e => { if (e.target === settingsEl) closeSettings(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && settingsEl.classList.contains('open')) closeSettings();
+  });
 
   // --- Open / save a file on disk (File System Access API; Chromium browsers) ---
   const fileLabel = document.getElementById('file');
