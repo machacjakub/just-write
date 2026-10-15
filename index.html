@@ -11,9 +11,10 @@
     --fg: #2b2b2b;
     --muted: #9a958c;
     --track: #e4dfd3;
+    --saved: #4f9a6f;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #1b1b1d; --fg: #dcdad5; --muted: #6d6b66; --track: #2e2e32; }
+    :root { --bg: #1b1b1d; --fg: #dcdad5; --muted: #6d6b66; --track: #2e2e32; --saved: #6fbf8f; }
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -81,28 +82,53 @@
     user-select: none;
   }
   #file:empty { display: none; }
-  #icons { display: flex; gap: 8px; }
+  #icons { display: flex; align-items: center; gap: 6px; }
   #help { position: relative; }
   .icon {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
-    border: 1px solid var(--muted);
-    border-radius: 50%;
-    font-size: 0.75rem;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 6px;
     cursor: pointer;
     background: none;
-    color: inherit;
+    color: var(--muted);
     padding: 0;
-    font-family: inherit;
+    font: 600 1.25rem/1 -apple-system, system-ui, sans-serif;
+    transition: color .15s;
+  }
+  .icon:hover { color: var(--fg); }
+  .icon svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   #help > .icon { cursor: help; }
+  /* Small badge on the save icon: amber = unsaved changes, green = file matches what was saved. */
+  #save-btn::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+    display: none;
+  }
+  #save-btn[data-state=dirty]::after { display: block; background: #e0a020; }
+  #save-btn[data-state=saved]::after { display: block; background: var(--saved); }
   #help > dl {
     position: absolute;
     left: 0;
-    bottom: 26px;
+    bottom: 36px;
     display: none;
     grid-template-columns: auto auto;
     gap: 6px 16px;
@@ -187,7 +213,15 @@
         <dt>Full screen</dt><dd id="fullscreen-key">F11</dd>
       </dl>
     </div>
-    <button class="icon" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
+    <button class="icon" id="settings-btn" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <button class="icon" id="open-btn" aria-label="Upload file" title="Upload file (⌘/Ctrl + O)">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </button>
+    <button class="icon" id="save-btn" aria-label="Save file" title="Save file (⌘/Ctrl + S)">
+      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    </button>
   </div>
   <div id="file"></div>
 </div>
@@ -325,6 +359,8 @@
   };
   document.getElementById('close').onclick = closeSettings;
   document.getElementById('settings-btn').onclick = openSettings;
+  document.getElementById('open-btn').onclick = () => openFile();
+  document.getElementById('save-btn').onclick = () => saveFile();
   settingsEl.addEventListener('click', e => { if (e.target === settingsEl) closeSettings(); });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && settingsEl.classList.contains('open')) closeSettings();
@@ -336,13 +372,19 @@
   const PICKER_TYPES = [{ description: 'Markdown', accept: { 'text/markdown': ['.md', '.markdown', '.txt'] } }];
   let handle = null;   // FileSystemFileHandle of the open file
   let name = '';       // name shown in the corner
-  let dirty = false;
+  let savedText = null;   // text as of the last open/save; null = nothing opened or saved yet
+  const saveBtn = document.getElementById('save-btn');
 
+  const isDirty = () => savedText === null ? editor.value !== '' : editor.value !== savedText;
+
+  // Shows the file name and tells whether the editor still matches the saved version.
   function showFile() {
+    const dirty = isDirty();
     fileLabel.textContent = name ? name + (dirty ? ' •' : '') : (dirty ? 'unsaved •' : '');
+    const state = dirty ? 'dirty' : savedText === null ? '' : 'saved';
+    saveBtn.dataset.state = state;
+    saveBtn.title = (state === 'dirty' ? 'Unsaved changes — save' : state === 'saved' ? 'Saved — matches the file' : 'Save file') + ' (⌘/Ctrl + S)';
   }
-
-  function setDirty(value) { dirty = value; showFile(); }
 
   async function openFile() {
     try {
@@ -365,11 +407,13 @@
         editor.value = await file.text();
       }
       update();
-      setDirty(false);
+      savedText = editor.value;
+      showFile();
     } catch (e) { /* picker cancelled */ }
   }
 
   async function saveFile() {
+    const text = editor.value;   // what gets saved, even if you keep typing while the picker is open
     try {
       if (canPick) {
         if (!handle) {
@@ -377,17 +421,18 @@
           name = handle.name;
         }
         const writable = await handle.createWritable();
-        await writable.write(editor.value);
+        await writable.write(text);
         await writable.close();
       } else {
         // No write access in this browser: download a copy instead.
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([editor.value], { type: 'text/markdown' }));
+        a.href = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
         a.download = name || 'untitled.md';
         a.click();
         URL.revokeObjectURL(a.href);
       }
-      setDirty(false);
+      savedText = text;
+      showFile();
     } catch (e) { /* save cancelled */ }
   }
 
@@ -403,17 +448,19 @@
   });
 
   window.addEventListener('beforeunload', e => {
-    if (dirty) e.preventDefault();
+    if (isDirty()) e.preventDefault();
   });
 
   editor.addEventListener('input', () => {
     update();
-    setDirty(true);
+    showFile();
     try { localStorage.setItem(KEY, editor.value); } catch (e) {}
     document.body.classList.add('typing');
     clearTimeout(idle);
     idle = setTimeout(() => document.body.classList.remove('typing'), 1500);
   });
+
+  showFile();
 </script>
 </body>
 </html>
