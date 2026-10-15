@@ -81,29 +81,30 @@
     color: var(--muted);
     user-select: none;
   }
+  #file { font-size: 0.95rem; }
   #file:empty { display: none; }
-  #icons { display: flex; align-items: center; gap: 6px; }
+  #icons { display: flex; align-items: center; gap: 14px; }
   #help { position: relative; }
   .icon {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
     border: 0;
     border-radius: 6px;
     cursor: pointer;
     background: none;
     color: var(--muted);
     padding: 0;
-    font: 600 1.25rem/1 -apple-system, system-ui, sans-serif;
+    font: 600 1.1rem/1 -apple-system, system-ui, sans-serif;
     transition: color .15s;
   }
   .icon:hover { color: var(--fg); }
   .icon svg {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     fill: none;
     stroke: currentColor;
     stroke-width: 1.8;
@@ -128,7 +129,7 @@
   #help > dl {
     position: absolute;
     left: 0;
-    bottom: 36px;
+    bottom: 34px;
     display: none;
     grid-template-columns: auto auto;
     gap: 6px 16px;
@@ -204,6 +205,7 @@
 <textarea id="editor" placeholder="Start writing…" autofocus spellcheck="true"></textarea>
 <div id="bars" aria-hidden="true"></div>
 <div id="corner">
+  <div id="file"></div>
   <div id="icons">
     <div id="help" tabindex="0">
       <span class="icon" aria-label="Keyboard shortcuts">?</span>
@@ -223,7 +225,6 @@
       <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
     </button>
   </div>
-  <div id="file"></div>
 </div>
 <div id="count" aria-live="polite">0 words</div>
 
